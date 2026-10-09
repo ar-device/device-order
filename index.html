@@ -166,7 +166,9 @@
     if (PREVIEW) {
       return Promise.resolve(action === 'options'
         ? { ok: true, options: { sales: ['営業 太郎(例)', '営業 花子(例)'], contractTypes: ['新規', 'MNP', '機種変更'],
-            devices: ['iPhone 17', 'iPhone 17 Pro'], colors: ['ブラック', 'ホワイト'], sims: ['あり', 'なし'], maxLines: 50 } }
+            devices: ['iPhone 17', 'iPhone 17 Pro'], colors: ['ブラック', 'ホワイト'],
+            categories: ['iPhone', 'Android'], devicesByCategory: { iPhone: ['iPhone 17 256GB'], Android: ['Galaxy S26 256GB'] },
+            colorsByDevice: { 'iPhone 17 256GB': ['ホワイト', 'ミストブルー'], 'Galaxy S26 256GB': ['ブラック'] }, sims: ['あり', 'なし'], maxLines: 50 } }
         : { ok: false, error: 'プレビューのため送信できません(API_URL未設定)' });
     }
     return fetch(API_URL, {
@@ -263,17 +265,68 @@
       (n === 1 ? '<button type="button" class="link" id="copyAll">この内容を全回線にコピー</button>' : '') + '</div>' +
       '<label for="' + p + 'msn">MSN</label>' +
       '<input id="' + p + 'msn" data-f="msn" type="tel" inputmode="tel" autocomplete="off">' +
+      (hasCategories() ?
+        '<label class="req" for="' + p + 'cat">区分</label>' +
+        '<select id="' + p + 'cat" data-f="cat" required></select>' : '') +
       '<label class="req" for="' + p + 'device">端末名</label>' +
       '<select id="' + p + 'device" data-f="device" required></select>' +
       '<div class="row">' +
         '<div><label class="req" for="' + p + 'color">カラー</label><select id="' + p + 'color" data-f="color" required></select></div>' +
         '<div><label class="req" for="' + p + 'sim">SIM有無</label><select id="' + p + 'sim" data-f="sim" required></select></div>' +
       '</div>';
-    fillSelect(div.querySelector('[data-f=device]'), OPTS.devices);
-    fillSelect(div.querySelector('[data-f=color]'), OPTS.colors, '選択');
+    if (hasCategories()) fillSelect(div.querySelector('[data-f=cat]'), OPTS.categories);
+    fillDevices(div);
     fillSelect(div.querySelector('[data-f=sim]'), OPTS.sims, '選択');
     return div;
   }
+
+  // 区分(iPhone/Android/ガラケー)を選ぶと、その区分の端末だけを端末名欄に出す
+  function hasCategories() {
+    return !!(OPTS.categories && OPTS.categories.length);
+  }
+  function fillDevices(line) {
+    var sel = line.querySelector('[data-f=device]');
+    if (!hasCategories()) {
+      fillSelect(sel, OPTS.devices);
+    } else {
+      var cat = line.querySelector('[data-f=cat]').value;
+      var current = sel.value;
+      if (!cat) {
+        fillSelect(sel, [], '先に区分を選択');
+        sel.disabled = true;
+      } else {
+        var list = OPTS.devicesByCategory[cat] || [];
+        fillSelect(sel, list);
+        sel.disabled = false;
+        if (list.indexOf(current) >= 0) sel.value = current;
+      }
+    }
+    fillColors(line);
+  }
+
+  // 選んだ端末のカラーだけをカラー欄に出す(選択中のカラーが残っていれば保持)
+  function colorsOf(device) {
+    return (OPTS.colorsByDevice && OPTS.colorsByDevice[device]) || OPTS.colors;
+  }
+  function fillColors(line) {
+    var device = line.querySelector('[data-f=device]').value;
+    var sel = line.querySelector('[data-f=color]');
+    var current = sel.value;
+    if (!device) {
+      fillSelect(sel, [], '端末を選択');
+      sel.disabled = true;
+      return;
+    }
+    var list = colorsOf(device);
+    fillSelect(sel, list, '選択');
+    sel.disabled = false;
+    if (list.indexOf(current) >= 0) sel.value = current;
+  }
+  linesEl.addEventListener('change', function (ev) {
+    var f = ev.target.getAttribute('data-f');
+    if (f === 'cat') fillDevices(ev.target.closest('.line'));
+    if (f === 'device') fillColors(ev.target.closest('.line'));
+  });
 
   // 回線数に合わせて増減(入力済みの内容は保持)
   function renderLines() {
@@ -299,8 +352,12 @@
     if (ev.target.id !== 'copyAll') return;
     var src = linesEl.children[0];
     Array.prototype.slice.call(linesEl.children, 1).forEach(function (line) {
-      ['device', 'color', 'sim'].forEach(function (f) {
-        line.querySelector('[data-f=' + f + ']').value = src.querySelector('[data-f=' + f + ']').value;
+      ['cat', 'device', 'color', 'sim'].forEach(function (f) {
+        var from = src.querySelector('[data-f=' + f + ']');
+        if (!from) return;
+        line.querySelector('[data-f=' + f + ']').value = from.value;
+        if (f === 'cat') fillDevices(line);
+        if (f === 'device') fillColors(line);
       });
     });
   });
@@ -311,7 +368,7 @@
     err.textContent = '';
     var bad = null;
     Array.prototype.forEach.call(form.querySelectorAll('[required]'), function (el) {
-      var ok = String(el.value).trim() !== '' && el.checkValidity();
+      var ok = String(el.value).trim() !== '' && (el.disabled || el.checkValidity());
       el.classList.toggle('invalid', !ok);
       if (!ok && !bad) bad = el;
     });
