@@ -75,6 +75,15 @@
   .case .cid { font-weight: 700; font-size: 15px; }
   .case .meta { color: var(--muted); font-size: 13px; }
   .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 16px 0 4px; }
+  .case input[type=radio] { border-radius: 50%; }
+  .case .lines { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .cline { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 10px; }
+  .cline .head { font-weight: 700; color: var(--accent-dark); }
+  .cline .now { font-size: 13px; color: var(--muted); margin: 2px 0 8px; }
+  .cline.locked { background: #f6f7f9; }
+  .cline.locked .now { margin-bottom: 0; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: #e8eaed; color: #3c4043; margin-left: 4px; }
+  .danger { background: var(--error); }
   textarea { width: 100%; font: inherit; font-size: 16px; padding: 11px 12px; border: 1px solid var(--line);
              border-radius: 8px; min-height: 72px; resize: vertical; }
 </style>
@@ -111,6 +120,8 @@
   <section id="menu" class="hidden" style="background:none;box-shadow:none;padding:0">
     <button type="button" class="menu-btn" id="goOrder"><strong>端末発注依頼</strong><span>新しく端末の発注を依頼する</span></button>
     <button type="button" class="menu-btn" id="goHandover"><strong>引き渡し依頼</strong><span>引き当て完了した端末の引き渡しを依頼する</span></button>
+    <button type="button" class="menu-btn" id="goColor"><strong>カラー変更依頼</strong><span>依頼済みの回線のカラーを変更する</span></button>
+    <button type="button" class="menu-btn" id="goCancel"><strong>キャンセル依頼</strong><span>依頼済みの案件をキャンセルする</span></button>
     <button type="button" class="logout" id="logout">合言葉を入力し直す</button>
   </section>
 
@@ -139,6 +150,58 @@
     <div>引き渡し依頼を送信しました</div>
     <div class="id" id="hoDoneMsg" style="font-size:20px;font-weight:700;margin:8px 0 16px"></div>
     <p class="hint">担当者から連絡があるまでお待ちください。</p>
+    <button type="button" class="sub" data-back>メニューに戻る</button>
+  </section>
+
+  <!-- カラー変更依頼 -->
+  <form id="cc" class="hidden" novalidate>
+    <button type="button" class="back" data-back>← メニューに戻る</button>
+    <section>
+      <h2>営業担当</h2>
+      <label class="req" for="ccSales">営業担当</label>
+      <select id="ccSales" required></select>
+    </section>
+    <section>
+      <h2>案件を選ぶ</h2>
+      <p class="hint">引き渡し済み・キャンセル済みの案件は表示されません。</p>
+      <div id="ccList"><p class="empty">営業担当を選ぶと表示されます。</p></div>
+    </section>
+    <section id="ccLineBox" class="hidden">
+      <h2>変更する回線とカラー</h2>
+      <p class="hint">変更したい回線だけ、変更後のカラーを選んでください。</p>
+      <div id="ccLines"></div>
+      <label for="ccNote">備考</label>
+      <textarea id="ccNote" placeholder="例: お客様のご希望により変更"></textarea>
+    </section>
+    <p class="err" id="ccErr" role="alert"></p>
+    <button id="ccSubmit" type="submit">カラー変更を依頼する</button>
+  </form>
+
+  <!-- キャンセル依頼 -->
+  <form id="cx" class="hidden" novalidate>
+    <button type="button" class="back" data-back>← メニューに戻る</button>
+    <section>
+      <h2>営業担当</h2>
+      <label class="req" for="cxSales">営業担当</label>
+      <select id="cxSales" required></select>
+    </section>
+    <section>
+      <h2>キャンセルする案件</h2>
+      <p class="hint">チェックした案件は全回線がキャンセルになります。引き渡し済み・キャンセル済みの案件は表示されません。</p>
+      <div id="cxList"><p class="empty">営業担当を選ぶと表示されます。</p></div>
+      <label for="cxNote">キャンセル理由</label>
+      <textarea id="cxNote" placeholder="例: お客様都合により契約見送り"></textarea>
+    </section>
+    <p class="err" id="cxErr" role="alert"></p>
+    <button id="cxSubmit" type="submit" class="danger">キャンセルを依頼する</button>
+  </form>
+
+  <!-- カラー変更・キャンセル 完了 -->
+  <section id="chDone" class="center hidden">
+    <div style="width:56px;height:56px;border-radius:50%;background:var(--ok);color:#fff;font-size:30px;line-height:56px;margin:0 auto 12px">✓</div>
+    <div id="chDoneTitle"></div>
+    <div id="chDoneMsg" style="font-size:20px;font-weight:700;margin:8px 0 16px"></div>
+    <p class="hint">担当者にメールで共有しました。</p>
     <button type="button" class="sub" data-back>メニューに戻る</button>
   </section>
 
@@ -213,9 +276,12 @@
     done: ['端末発注依頼', ''],
     ho: ['引き渡し依頼', '営業担当を選び、引き渡す案件にチェックしてください。'],
     hoDone: ['引き渡し依頼', ''],
+    cc: ['カラー変更依頼', '案件と回線を選び、変更後のカラーを選んでください。'],
+    cx: ['キャンセル依頼', 'キャンセルする案件にチェックしてください。'],
+    chDone: ['依頼完了', ''],
   };
   function show(id) {
-    ['loading', 'loadError', 'login', 'menu', 'f', 'done', 'ho', 'hoDone'].forEach(function (x) {
+    ['loading', 'loadError', 'login', 'menu', 'f', 'done', 'ho', 'hoDone', 'cc', 'cx', 'chDone'].forEach(function (x) {
       $(x).classList.toggle('hidden', x !== id);
     });
     var t = TITLES[id] || TITLES.menu;
@@ -235,6 +301,10 @@
             devices: ['iPhone 17', 'iPhone 17 Pro'], colors: ['ブラック', 'ホワイト'],
             categories: ['iPhone', 'Android'], devicesByCategory: { iPhone: ['iPhone 17 256GB'], Android: ['Galaxy S26 256GB'] },
             colorsByDevice: { 'iPhone 17 256GB': ['ホワイト', 'ミストブルー'], 'Galaxy S26 256GB': ['ブラック'] }, sims: ['あり', 'なし'], maxLines: 50 } }
+        : action === 'caseList'
+        ? { ok: true, items: [{ id: 'REQ-20261013-001', company: 'テスト株式会社', appNo: '', contractType: '機種変更', lines: [
+            { no: 1, device: 'iPhone 17 256GB', color: 'ホワイト', status: '発注手配中', colors: ['ホワイト', 'ミストブルー', 'ラベンダー'] },
+            { no: 2, device: 'iPhone 17 256GB', color: 'ホワイト', status: '引き当て完了', colors: ['ホワイト', 'ミストブルー'] }] }] }
         : action === 'handoverList'
         ? { ok: true, items: [{ id: 'REQ-20261013-001', company: 'テスト株式会社', lines: 2, contractType: '機種変更' }] }
         : { ok: false, error: 'プレビューのため送信できません(API_URL未設定)' });
@@ -585,6 +655,185 @@
       btn.disabled = false;
       btn.textContent = '引き渡しを依頼する';
     });
+  });
+
+  /* ---------- カラー変更・キャンセル(共通) ---------- */
+
+  var COLOR_CHANGEABLE = ['未対応', '発注手配中', '発注完了'];
+  var cases = { cc: [], cx: [] };
+
+  function openCaseForm(key) {
+    fillSelect($(key + 'Sales'), OPTS.sales);
+    var saved = load(SALES_KEY);
+    if (saved && OPTS.sales.indexOf(saved) >= 0) $(key + 'Sales').value = saved;
+    $(key + 'Err').textContent = '';
+    $(key + 'Note').value = '';
+    show(key);
+    loadCases(key);
+  }
+
+  function emptyMsg(el, text) {
+    el.innerHTML = '';
+    var p = document.createElement('p');
+    p.className = 'empty';
+    p.textContent = text;
+    el.appendChild(p);
+  }
+
+  function loadCases(key) {
+    var sales = $(key + 'Sales').value;
+    var list = $(key + 'List');
+    if (key === 'cc') { $('ccLineBox').classList.add('hidden'); $('ccLines').innerHTML = ''; }
+    if (!sales) { emptyMsg(list, '営業担当を選ぶと表示されます。'); return; }
+    emptyMsg(list, '読み込み中…');
+    api('caseList', { sales: sales }).then(function (res) {
+      if ($(key + 'Sales').value !== sales) return;
+      if (!res.ok) throw new Error(res.error);
+      cases[key] = res.items;
+      renderCases(key);
+    }).catch(function (e) {
+      list.innerHTML = '';
+      var p = document.createElement('p');
+      p.className = 'err';
+      p.textContent = '読み込めませんでした: ' + e.message;
+      list.appendChild(p);
+    });
+  }
+
+  function lineSummary(c) {
+    var active = c.lines.filter(function (l) { return l.status !== 'キャンセル'; });
+    return active.map(function (l) { return circled(l.no) + ' ' + l.device + '・' + l.color + '（' + l.status + '）'; }).join('\n');
+  }
+
+  function renderCases(key) {
+    var list = $(key + 'List');
+    var items = cases[key];
+    if (!items.length) { emptyMsg(list, '対象の案件はありません。'); return; }
+    list.innerHTML = '';
+    items.forEach(function (c) {
+      var label = document.createElement('label');
+      label.className = 'case';
+      var input = document.createElement('input');
+      input.type = key === 'cc' ? 'radio' : 'checkbox';
+      input.name = key + 'Case';
+      input.value = c.id;
+      input.addEventListener('change', function () {
+        Array.prototype.forEach.call(list.querySelectorAll('.case'), function (el) {
+          el.classList.toggle('checked', el.querySelector('input').checked);
+        });
+        if (key === 'cc') renderColorLines(c);
+      });
+      var box = document.createElement('div');
+      var name = document.createElement('div'); name.className = 'cid'; name.textContent = c.company;
+      var meta = document.createElement('div'); meta.className = 'meta';
+      var active = c.lines.filter(function (l) { return l.status !== 'キャンセル'; }).length;
+      meta.textContent = c.id + '　' + active + '回線' + (c.contractType ? '・' + c.contractType : '');
+      var lines = document.createElement('div'); lines.className = 'lines';
+      lines.style.whiteSpace = 'pre-line';
+      lines.textContent = lineSummary(c);
+      box.appendChild(name); box.appendChild(meta); box.appendChild(lines);
+      label.appendChild(input); label.appendChild(box);
+      list.appendChild(label);
+    });
+  }
+
+  // ---------- カラー変更 ----------
+
+  function renderColorLines(c) {
+    var wrap = $('ccLines');
+    wrap.innerHTML = '';
+    c.lines.forEach(function (l) {
+      var div = document.createElement('div');
+      var ok = COLOR_CHANGEABLE.indexOf(l.status) >= 0;
+      div.className = 'cline' + (ok ? '' : ' locked');
+      var head = document.createElement('div'); head.className = 'head';
+      head.textContent = '回線' + circled(l.no) + ' ' + l.device;
+      var now = document.createElement('div'); now.className = 'now';
+      now.textContent = '現在のカラー: ' + l.color;
+      var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = l.status;
+      now.appendChild(tag);
+      div.appendChild(head); div.appendChild(now);
+      var others = l.colors.filter(function (x) { return x !== l.color; });
+      if (ok && others.length) {
+        var sel = document.createElement('select');
+        sel.setAttribute('data-no', l.no);
+        fillSelect(sel, others, '変更しない');
+        div.appendChild(sel);
+      } else if (ok) {
+        var none = document.createElement('div'); none.className = 'hint';
+        none.textContent = '他に選べるカラーがありません（「端末一覧」シートに登録されているカラーのみ選べます）';
+        div.appendChild(none);
+      } else {
+        var why = document.createElement('div'); why.className = 'hint';
+        why.textContent = l.status === 'キャンセル' ? 'キャンセル済みのため変更できません'
+          : '引き当て済みのため変更できません（担当者に直接ご相談ください）';
+        div.appendChild(why);
+      }
+      wrap.appendChild(div);
+    });
+    $('ccLineBox').classList.remove('hidden');
+  }
+
+  $('ccSales').addEventListener('change', function () { store(SALES_KEY, $('ccSales').value); loadCases('cc'); });
+  $('cxSales').addEventListener('change', function () { store(SALES_KEY, $('cxSales').value); loadCases('cx'); });
+  $('goColor').onclick = function () { openCaseForm('cc'); };
+  $('goCancel').onclick = function () { openCaseForm('cx'); };
+
+  function sendCaseRequest(key, action, data, doneTitle, doneUnit) {
+    var err = $(key + 'Err'), btn = $(key + 'Submit'), label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '送信中…';
+    api(action, data).then(function (res) {
+      if (res.ok) {
+        $('chDoneTitle').textContent = doneTitle;
+        $('chDoneMsg').textContent = res.count + doneUnit;
+        show('chDone');
+      } else if (res.code === 'PASSCODE') {
+        store(PASS_KEY, null);
+        $('loginErr').textContent = '合言葉が変更されました。新しい合言葉を入力してから、もう一度送信してください。';
+        lastScreen = key;
+        show('login');
+      } else {
+        err.textContent = '送信できませんでした: ' + res.error;
+        loadCases(key);
+      }
+    }).catch(function (e) {
+      err.textContent = '送信できませんでした: ' + e.message + '。電波の良い場所で再度お試しください。';
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = label;
+    });
+  }
+
+  $('cc').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var err = $('ccErr');
+    err.textContent = '';
+    var sales = $('ccSales').value;
+    var picked = $('ccList').querySelector('input:checked');
+    if (!sales) { err.textContent = '営業担当を選択してください。'; return; }
+    if (!picked) { err.textContent = '案件を選んでください。'; return; }
+    var changes = Array.prototype.filter.call($('ccLines').querySelectorAll('select'), function (s) { return s.value; })
+      .map(function (s) { return { no: Number(s.getAttribute('data-no')), color: s.value }; });
+    if (!changes.length) { err.textContent = '変更後のカラーを選んでください。'; return; }
+    sendCaseRequest('cc', 'colorChange', { sales: sales, id: picked.value, changes: changes, note: $('ccNote').value },
+      'カラー変更を依頼しました', '回線');
+  });
+
+  // ---------- キャンセル ----------
+
+  $('cx').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var err = $('cxErr');
+    err.textContent = '';
+    var sales = $('cxSales').value;
+    var ids = Array.prototype.map.call($('cxList').querySelectorAll('input:checked'), function (c) { return c.value; });
+    if (!sales) { err.textContent = '営業担当を選択してください。'; return; }
+    if (!ids.length) { err.textContent = 'キャンセルする案件にチェックを入れてください。'; return; }
+    var names = cases.cx.filter(function (c) { return ids.indexOf(c.id) >= 0; })
+      .map(function (c) { return '・' + c.company + '（' + c.id + '）'; }).join('\n');
+    if (!window.confirm('次の案件をキャンセルします。よろしいですか？\n\n' + names)) return;
+    sendCaseRequest('cx', 'cancel', { sales: sales, ids: ids, note: $('cxNote').value }, 'キャンセルを依頼しました', '件');
   });
 
   /* ---------- 起動 ---------- */
