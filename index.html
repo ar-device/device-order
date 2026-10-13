@@ -63,12 +63,26 @@
   #done .id { font-size: 22px; font-weight: 700; letter-spacing: .5px; margin: 8px 0 16px; }
   .sub { background: #fff; color: var(--accent); border: 1px solid var(--accent); margin-top: 16px; }
   .logout { background: none; color: var(--muted); font-size: 12px; font-weight: 400; padding: 8px; margin-top: 8px; }
+  .back { background: none; color: var(--accent); font-size: 14px; font-weight: 600; width: auto; padding: 0 0 12px; }
+  .menu-btn { display: block; text-align: left; padding: 18px 16px; margin-bottom: 12px; border-radius: 12px;
+              background: var(--card); color: var(--text); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .menu-btn strong { display: block; font-size: 17px; color: var(--accent-dark); }
+  .menu-btn span { display: block; font-size: 13px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .case { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px;
+          padding: 12px; margin-top: 10px; cursor: pointer; font-weight: 400; }
+  .case input { width: 22px; height: 22px; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+  .case.checked { border-color: var(--accent); background: var(--accent-soft); }
+  .case .cid { font-weight: 700; font-size: 15px; }
+  .case .meta { color: var(--muted); font-size: 13px; }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 16px 0 4px; }
+  textarea { width: 100%; font: inherit; font-size: 16px; padding: 11px 12px; border: 1px solid var(--line);
+             border-radius: 8px; min-height: 72px; resize: vertical; }
 </style>
 </head>
 <body>
 <header>
-  <h1>携帯端末 発注依頼</h1>
-  <p>入力後「依頼を送信」を押してください。</p>
+  <h1 id="title">携帯端末 発注・引き渡し</h1>
+  <p id="subtitle">依頼の種類を選んでください。</p>
 </header>
 
 <main>
@@ -93,8 +107,44 @@
     </form>
   </section>
 
+  <!-- メニュー -->
+  <section id="menu" class="hidden" style="background:none;box-shadow:none;padding:0">
+    <button type="button" class="menu-btn" id="goOrder"><strong>端末発注依頼</strong><span>新しく端末の発注を依頼する</span></button>
+    <button type="button" class="menu-btn" id="goHandover"><strong>引き渡し依頼</strong><span>引き当て完了した端末の引き渡しを依頼する</span></button>
+    <button type="button" class="logout" id="logout">合言葉を入力し直す</button>
+  </section>
+
+  <!-- 引き渡し依頼フォーム -->
+  <form id="ho" class="hidden" novalidate>
+    <button type="button" class="back" data-back>← メニューに戻る</button>
+    <section>
+      <h2>営業担当</h2>
+      <label class="req" for="hoSales">営業担当</label>
+      <select id="hoSales" required></select>
+    </section>
+    <section>
+      <h2>未引き渡しの案件</h2>
+      <p class="hint">引き渡しを依頼する案件にチェックを入れてください。</p>
+      <div id="hoList"><p class="empty">営業担当を選ぶと表示されます。</p></div>
+      <label for="hoNote">備考（希望日時・受け取り場所など）</label>
+      <textarea id="hoNote" placeholder="例: 10/15 午前中に本社で受け取り希望"></textarea>
+    </section>
+    <p class="err" id="hoErr" role="alert"></p>
+    <button id="hoSubmit" type="submit">引き渡しを依頼する</button>
+  </form>
+
+  <!-- 引き渡し依頼 完了 -->
+  <section id="hoDone" class="center hidden">
+    <div class="mark" style="width:56px;height:56px;border-radius:50%;background:var(--ok);color:#fff;font-size:30px;line-height:56px;margin:0 auto 12px">✓</div>
+    <div>引き渡し依頼を送信しました</div>
+    <div class="id" id="hoDoneMsg" style="font-size:20px;font-weight:700;margin:8px 0 16px"></div>
+    <p class="hint">担当者から連絡があるまでお待ちください。</p>
+    <button type="button" class="sub" data-back>メニューに戻る</button>
+  </section>
+
   <!-- 依頼フォーム -->
   <form id="f" class="hidden" novalidate>
+    <button type="button" class="back" data-back>← メニューに戻る</button>
     <section>
       <h2>申込情報</h2>
       <label class="req" for="sales">営業担当</label>
@@ -125,7 +175,6 @@
 
     <p class="err" id="err" role="alert"></p>
     <button id="submit" type="submit">依頼を送信</button>
-    <button type="button" class="logout" id="logout">合言葉を入力し直す</button>
   </form>
 
   <!-- 完了 -->
@@ -135,6 +184,7 @@
     <div class="id" id="doneId"></div>
     <p class="hint">依頼IDは問い合わせ時に使用します。<br>発注が完了すると端末情報がメールで届きます。</p>
     <button type="button" class="sub" id="again">続けて依頼する</button>
+    <button type="button" class="logout" data-back>メニューに戻る</button>
   </section>
 </main>
 
@@ -145,6 +195,7 @@
   var PREVIEW = API_URL.indexOf('https://') !== 0; // URL未設定時はサンプルで表示だけ確認できる
   var OPTS = null;
   var passcode = '';
+  var lastScreen = '';
 
   var $ = function (id) { return document.getElementById(id); };
   var form = $('f'), linesEl = $('lines'), countEl = $('lineCount'), err = $('err'), btn = $('submit');
@@ -156,10 +207,25 @@
     try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
   }
 
+  var TITLES = {
+    menu: ['携帯端末 発注・引き渡し', '依頼の種類を選んでください。'],
+    f: ['端末発注依頼', '入力後「依頼を送信」を押してください。'],
+    done: ['端末発注依頼', ''],
+    ho: ['引き渡し依頼', '営業担当を選び、引き渡す案件にチェックしてください。'],
+    hoDone: ['引き渡し依頼', ''],
+  };
   function show(id) {
-    ['loading', 'loadError', 'login', 'f', 'done'].forEach(function (x) { $(x).classList.toggle('hidden', x !== id); });
+    ['loading', 'loadError', 'login', 'menu', 'f', 'done', 'ho', 'hoDone'].forEach(function (x) {
+      $(x).classList.toggle('hidden', x !== id);
+    });
+    var t = TITLES[id] || TITLES.menu;
+    $('title').textContent = t[0];
+    $('subtitle').textContent = t[1];
     window.scrollTo(0, 0);
   }
+  document.addEventListener('click', function (ev) {
+    if (ev.target.closest('[data-back]')) show('menu');
+  });
 
   // Apps Script へ送信(text/plain にすることで CORS の事前確認を回避)
   function api(action, data) {
@@ -169,6 +235,8 @@
             devices: ['iPhone 17', 'iPhone 17 Pro'], colors: ['ブラック', 'ホワイト'],
             categories: ['iPhone', 'Android'], devicesByCategory: { iPhone: ['iPhone 17 256GB'], Android: ['Galaxy S26 256GB'] },
             colorsByDevice: { 'iPhone 17 256GB': ['ホワイト', 'ミストブルー'], 'Galaxy S26 256GB': ['ブラック'] }, sims: ['あり', 'なし'], maxLines: 50 } }
+        : action === 'handoverList'
+        ? { ok: true, items: [{ id: 'REQ-20261013-001', company: 'テスト株式会社', lines: 2, contractType: '機種変更' }] }
         : { ok: false, error: 'プレビューのため送信できません(API_URL未設定)' });
     }
     return fetch(API_URL, {
@@ -189,8 +257,9 @@
     return api('options').then(function (res) {
       if (res.ok) {
         store(PASS_KEY, passcode);
-        if (!OPTS) initForm(res.options); // 再入力時は入力中の内容を残す
-        show('f');
+        var first = !OPTS;
+        if (first) initForm(res.options); // 再入力時は入力中の内容を残す
+        show(first || !lastScreen ? 'menu' : lastScreen);
       } else if (res.code === 'PASSCODE') {
         store(PASS_KEY, null);
         show('login');
@@ -404,6 +473,7 @@
         // 合言葉が変更された場合。入力内容は残したまま合言葉画面へ
         store(PASS_KEY, null);
         $('loginErr').textContent = '合言葉が変更されました。新しい合言葉を入力してから、もう一度送信してください。';
+        lastScreen = 'f';
         show('login');
       } else {
         err.textContent = '送信できませんでした: ' + res.error;
@@ -424,6 +494,97 @@
     countEl.value = 1;
     renderLines();
     show('f');
+  });
+
+  /* ---------- 引き渡し依頼 ---------- */
+
+  $('goOrder').onclick = function () { show('f'); };
+  $('goHandover').onclick = function () {
+    fillSelect($('hoSales'), OPTS.sales);
+    var saved = load(SALES_KEY);
+    if (saved && OPTS.sales.indexOf(saved) >= 0) $('hoSales').value = saved;
+    $('hoErr').textContent = '';
+    show('ho');
+    loadHandoverList();
+  };
+  $('hoSales').addEventListener('change', function () {
+    store(SALES_KEY, $('hoSales').value);
+    loadHandoverList();
+  });
+
+  function loadHandoverList() {
+    var sales = $('hoSales').value;
+    var list = $('hoList');
+    if (!sales) { list.innerHTML = '<p class="empty">営業担当を選ぶと表示されます。</p>'; return; }
+    list.innerHTML = '<p class="empty">読み込み中…</p>';
+    api('handoverList', { sales: sales }).then(function (res) {
+      if ($('hoSales').value !== sales) return; // 途中で営業担当が変わった
+      if (!res.ok) throw new Error(res.error);
+      renderHandoverList(res.items);
+    }).catch(function (e) {
+      list.innerHTML = '';
+      var p = document.createElement('p');
+      p.className = 'err';
+      p.textContent = '読み込めませんでした: ' + e.message;
+      list.appendChild(p);
+    });
+  }
+
+  function renderHandoverList(items) {
+    var list = $('hoList');
+    list.innerHTML = '';
+    if (!items.length) {
+      list.innerHTML = '<p class="empty">未引き渡しの案件はありません。</p>';
+      return;
+    }
+    items.forEach(function (it) {
+      var label = document.createElement('label');
+      label.className = 'case';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = it.id;
+      cb.addEventListener('change', function () { label.classList.toggle('checked', cb.checked); });
+      var box = document.createElement('div');
+      var id = document.createElement('div'); id.className = 'cid'; id.textContent = it.company;
+      var meta = document.createElement('div'); meta.className = 'meta';
+      meta.textContent = it.id + '　' + it.lines + '回線' + (it.contractType ? '・' + it.contractType : '');
+      box.appendChild(id); box.appendChild(meta);
+      label.appendChild(cb); label.appendChild(box);
+      list.appendChild(label);
+    });
+  }
+
+  $('ho').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var err = $('hoErr'), btn = $('hoSubmit');
+    err.textContent = '';
+    var sales = $('hoSales').value;
+    var ids = Array.prototype.map.call($('hoList').querySelectorAll('input:checked'), function (c) { return c.value; });
+    if (!sales) { err.textContent = '営業担当を選択してください。'; return; }
+    if (!ids.length) { err.textContent = '引き渡しを依頼する案件にチェックを入れてください。'; return; }
+
+    btn.disabled = true;
+    btn.textContent = '送信中…';
+    api('handover', { sales: sales, ids: ids, note: $('hoNote').value }).then(function (res) {
+      if (res.ok) {
+        $('hoDoneMsg').textContent = res.count + '件';
+        $('hoNote').value = '';
+        show('hoDone');
+      } else if (res.code === 'PASSCODE') {
+        store(PASS_KEY, null);
+        $('loginErr').textContent = '合言葉が変更されました。新しい合言葉を入力してから、もう一度送信してください。';
+        lastScreen = 'ho';
+        show('login');
+      } else {
+        err.textContent = '送信できませんでした: ' + res.error;
+        loadHandoverList();
+      }
+    }).catch(function (e) {
+      err.textContent = '送信できませんでした: ' + e.message + '。電波の良い場所で再度お試しください。';
+    }).then(function () {
+      btn.disabled = false;
+      btn.textContent = '引き渡しを依頼する';
+    });
   });
 
   /* ---------- 起動 ---------- */
