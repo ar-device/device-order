@@ -48,6 +48,12 @@
   .line-head { display: flex; align-items: center; justify-content: space-between; }
   .line-head strong { color: var(--accent-dark); font-size: 16px; }
   .line label { margin-top: 10px; }
+  .stock { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .line label.chk { display: flex; align-items: center; gap: 8px; margin: 0; padding: 9px 12px; border: 1px solid var(--line);
+                    border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; background: #fff; }
+  .chk input { width: 18px; height: 18px; margin: 0; padding: 0; flex: none; }
+  .chk.on[data-k=stockOwn] { background: #fce8b2; border-color: #f9ab00; color: #7a4a00; }
+  .chk.on[data-k=stockIkebukuro] { background: #e9d7fe; border-color: #a142f4; color: #5b1fa6; }
   .link { background: none; color: var(--accent); font-size: 13px; font-weight: 600; width: auto; padding: 4px 0; }
   button {
     width: 100%; font: inherit; font-weight: 700; font-size: 17px; padding: 14px; border: 0; border-radius: 10px;
@@ -394,6 +400,14 @@
     if (saved && OPTS.sales.indexOf(saved) >= 0) form.elements.sales.value = saved;
   }
 
+  // 回線ごとの在庫指定(チェック項目)
+  var STOCK_OPTIONS = [['stockOwn', '自社在庫使用'], ['stockIkebukuro', '池袋フリー在庫使用']];
+  function stockHtml() {
+    return '<div class="stock">' + STOCK_OPTIONS.map(function (o) {
+      return '<label class="chk" data-k="' + o[0] + '"><input type="checkbox" data-f="' + o[0] + '">' + o[1] + '</label>';
+    }).join('') + '</div>';
+  }
+
   // 回線入力欄を作る
   function makeLine(i) {
     var n = i + 1, p = 'l' + n + '_';
@@ -412,7 +426,7 @@
       '<div class="row">' +
         '<div><label class="req" for="' + p + 'color">カラー</label><select id="' + p + 'color" data-f="color" required></select></div>' +
         '<div><label class="req" for="' + p + 'sim">SIM有無</label><select id="' + p + 'sim" data-f="sim" required></select></div>' +
-      '</div>';
+      '</div>' + stockHtml();
     if (hasCategories()) fillSelect(div.querySelector('[data-f=cat]'), OPTS.categories);
     fillDevices(div);
     fillSelect(div.querySelector('[data-f=sim]'), OPTS.sims, '選択');
@@ -462,6 +476,7 @@
     if (list.indexOf(current) >= 0) sel.value = current;
   }
   linesEl.addEventListener('change', function (ev) {
+    if (ev.target.type === 'checkbox') ev.target.closest('.chk').classList.toggle('on', ev.target.checked);
     var f = ev.target.getAttribute('data-f');
     if (f === 'cat') fillDevices(ev.target.closest('.line'));
     if (f === 'device') fillColors(ev.target.closest('.line'));
@@ -498,6 +513,11 @@
         if (f === 'cat') fillDevices(line);
         if (f === 'device') fillColors(line);
       });
+      STOCK_OPTIONS.forEach(function (o) {
+        var to = line.querySelector('[data-f=' + o[0] + ']');
+        to.checked = src.querySelector('[data-f=' + o[0] + ']').checked;
+        to.closest('.chk').classList.toggle('on', to.checked);
+      });
     });
   });
   form.addEventListener('change', function (ev) { ev.target.classList.remove('invalid'); });
@@ -528,6 +548,7 @@
       lines: Array.prototype.map.call(linesEl.children, function (line) {
         var l = {};
         LINE_FIELDS.forEach(function (f) { l[f] = line.querySelector('[data-f=' + f + ']').value; });
+        STOCK_OPTIONS.forEach(function (o) { l[o[0]] = line.querySelector('[data-f=' + o[0] + ']').checked; });
         return l;
       }),
     };
